@@ -7,7 +7,7 @@
 
 # Gradle internals
 .gradle/
-gradle/wrapper/gradle-wrapper.jar
+# gradle/wrapper/gradle-wrapper.jar  ← must be tracked for CI
 
 # Local configuration (machine-specific)
 local.properties
