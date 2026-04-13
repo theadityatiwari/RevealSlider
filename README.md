@@ -4,8 +4,7 @@
 
 ### A production-ready Android before/after image comparison slider
 
-<!-- Replace the line below with your actual demo GIF once recorded -->
-<!-- <img src="art/demo.gif" width="380" alt="RevealSlider demo"/> -->
+<img src="art/demo.gif" width="270" alt="RevealSlider demo"/>
 
 [![JitPack](https://jitpack.io/v/theadityatiwari/RevealSlider.svg)](https://jitpack.io/#theadityatiwari/RevealSlider)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
