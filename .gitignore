@@ -1,0 +1,26 @@
+# Built artifacts
+*.iml
+/build
+/app/build
+/revealslider/build
+/captures
+
+# Gradle internals
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration (machine-specific)
+local.properties
+
+# Android Studio / IntelliJ IDEA
+/.idea/
+.DS_Store
+*.stackdump
+
+# Native build
+.externalNativeBuild
+.cxx
+
+# Claude Code (AI assistant meta-files — not part of the project)
+CLAUDE.md
+.claude/

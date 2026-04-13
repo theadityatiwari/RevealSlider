@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">RevealSlider Demo</string>
+    <string name="position_default">Position: 50%</string>
+    <string name="label_blur_type">Blur Type</string>
+    <string name="label_blur_radius">Blur Radius</string>
+    <string name="label_pixel_size">Pixel Size</string>
+    <string name="label_direction">Direction</string>
+    <string name="direction_before_after">Before | After</string>
+    <string name="direction_after_before">After | Before</string>
+    <string name="label_show_labels">Show Labels</string>
+    <string name="label_corner_radius">Corner Radius</string>
+</resources>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="RevealSliderView">
+
+        <!-- Image source (same concept as ImageView's src) -->
+        <attr name="revealSrc" format="reference" />
+
+        <!-- Scale type for the image inside the view -->
+        <attr name="sliderScaleType" format="enum">
+            <enum name="center_crop" value="0" />
+            <enum name="fit_center" value="1" />
+        </attr>
+
+        <!-- Blur / effect type applied to the "Before" side -->
+        <attr name="blurType" format="enum">
+            <enum name="gaussian" value="0" />
+            <enum name="frosted_glass" value="1" />
+            <enum name="dark_fade" value="2" />
+            <enum name="pixelate" value="3" />
+        </attr>
+
+        <!-- Gaussian blur radius, 1..25 (used by GAUSSIAN, FROSTED_GLASS, DARK_FADE) -->
+        <attr name="blurRadius" format="float" />
+
+        <!-- White overlay alpha for FROSTED_GLASS, 0..255 -->
+        <attr name="frostedAlpha" format="integer" />
+
+        <!-- Dark overlay alpha for DARK_FADE, 0..255 -->
+        <attr name="darkFadeAlpha" format="integer" />
+
+        <!-- Block size in pixels for PIXELATE -->
+        <attr name="pixelSize" format="integer" />
+
+        <!-- Divider line -->
+        <attr name="dividerWidth" format="dimension" />
+        <attr name="dividerColor" format="color" />
+
+        <!-- Handle circle -->
+        <attr name="handleIcon" format="reference" />
+        <attr name="handleSize" format="dimension" />
+        <attr name="handleColor" format="color" />
+
+        <!-- Rounded corners for the entire view -->
+        <attr name="cornerRadius" format="dimension" />
+
+        <!-- Which side is blurred -->
+        <attr name="sliderDirection" format="enum">
+            <enum name="before_after" value="0" />
+            <enum name="after_before" value="1" />
+        </attr>
+
+        <!-- Starting divider position, 0.0..1.0 -->
+        <attr name="initialPosition" format="float" />
+
+        <!-- Optional before/after labels -->
+        <attr name="showLabels" format="boolean" />
+        <attr name="beforeLabel" format="string" />
+        <attr name="afterLabel" format="string" />
+        <attr name="labelTextColor" format="color" />
+        <attr name="labelTextSize" format="dimension" />
+        <attr name="labelBackground" format="color" />
+
+    </declare-styleable>
+</resources>
