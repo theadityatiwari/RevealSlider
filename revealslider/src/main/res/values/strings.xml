@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TalkBack announcement when the divider position changes.
+         %1$d is replaced with the integer percentage (0–100). -->
+    <string name="rsv_accessibility_desc">Reveal slider, %1$d%%</string>
+</resources>

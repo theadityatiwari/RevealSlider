@@ -5,34 +5,63 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- ── Slider view ─────────────────────────────────────────────── -->
-    <com.theadityatiwari.revealslider.RevealSliderView
-        android:id="@+id/revealSlider"
+    <!-- ── Hero: Slider ───────────────────────────────────────────────────── -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
-        android:layout_height="220dp"
-        app:blurType="gaussian"
-        app:blurRadius="15"
-        app:cornerRadius="0dp"
-        app:initialPosition="0.5"
-        app:showLabels="true" />
+        android:layout_height="300dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="12dp"
+        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:strokeColor="?attr/colorPrimary"
+        app:strokeWidth="1.5dp">
 
-    <!-- Position readout -->
-    <TextView
-        android:id="@+id/tvPosition"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingVertical="6dp"
-        android:text="@string/position_default"
-        android:textAppearance="?attr/textAppearanceBodyMedium" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="?attr/colorOutlineVariant" />
+            <com.theadityatiwari.revealslider.RevealSliderView
+                android:id="@+id/revealSlider"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:blurType="gaussian"
+                app:blurRadius="15"
+                app:cornerRadius="16dp"
+                app:initialPosition="0.5"
+                app:showLabels="true" />
 
-    <!-- ── Controls ────────────────────────────────────────────────── -->
-    <ScrollView
+            <!-- Position badge overlaid at the bottom centre -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#CC000000"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="0dp">
+
+                <TextView
+                    android:id="@+id/tvPosition"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="6dp"
+                    android:text="@string/position_default"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="@android:color/white" />
+
+            </com.google.android.material.card.MaterialCardView>
+
+        </FrameLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- ── Controls ───────────────────────────────────────────────────────── -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -44,177 +73,561 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Blur Type ─────────────────────────────────────────── -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/label_blur_type"
-                android:textAppearance="?attr/textAppearanceLabelLarge" />
-
-            <Spinner
-                android:id="@+id/spinnerBlurType"
+            <!-- ── Card: Mode toggle ────────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp" />
-
-            <!-- Blur Radius group (hidden when PIXELATE is selected) -->
-            <LinearLayout
-                android:id="@+id/groupBlurRadius"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/label_blur_radius"
-                        android:textAppearance="?attr/textAppearanceLabelLarge" />
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.12"
+                        android:text="@string/section_mode"
+                        android:textAllCaps="true"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:textColor="?attr/colorPrimary" />
 
-                    <TextView
-                        android:id="@+id/tvBlurRadiusValue"
-                        android:layout_width="40dp"
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/toggleMode"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="15"
-                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                        app:singleSelection="true"
+                        app:selectionRequired="true">
+
+                        <Button
+                            android:id="@+id/btnModeSingle"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="true"
+                            android:text="@string/mode_single" />
+
+                        <Button
+                            android:id="@+id/btnModeDual"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/mode_dual" />
+
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <SeekBar
-                    android:id="@+id/seekBlurRadius"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:max="24"
-                    android:progress="14" />
-            </LinearLayout>
-
-            <!-- Pixel Size group (shown only when PIXELATE is selected) -->
-            <LinearLayout
-                android:id="@+id/groupPixelSize"
+            <!-- ── Card: Images (dual-image mode only) ──────────────────── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardImages"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone">
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/label_pixel_size"
-                        android:textAppearance="?attr/textAppearanceLabelLarge" />
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.12"
+                        android:text="@string/section_images"
+                        android:textAllCaps="true"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:textColor="?attr/colorPrimary" />
 
-                    <TextView
-                        android:id="@+id/tvPixelSizeValue"
-                        android:layout_width="40dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="16"
-                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                        android:orientation="horizontal">
+
+                        <!-- Before image tile -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardPickBefore"
+                            android:layout_width="0dp"
+                            android:layout_height="150dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                            app:cardCornerRadius="12dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:strokeWidth="1dp">
+
+                            <FrameLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent">
+
+                                <ImageView
+                                    android:id="@+id/imgBefore"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:scaleType="centerCrop"
+                                    android:visibility="gone" />
+
+                                <!-- Placeholder -->
+                                <LinearLayout
+                                    android:id="@+id/placeholderBefore"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="+"
+                                        android:textSize="28sp"
+                                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="@string/hint_tap_to_choose"
+                                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                </LinearLayout>
+
+                                <!-- "BEFORE" badge at bottom-start -->
+                                <com.google.android.material.card.MaterialCardView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="bottom|start"
+                                    android:layout_margin="8dp"
+                                    app:cardBackgroundColor="#CC000000"
+                                    app:cardCornerRadius="6dp"
+                                    app:cardElevation="0dp"
+                                    app:strokeWidth="0dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:paddingHorizontal="8dp"
+                                        android:paddingVertical="3dp"
+                                        android:text="@string/label_before_image"
+                                        android:textAllCaps="true"
+                                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                                        android:textColor="@android:color/white" />
+
+                                </com.google.android.material.card.MaterialCardView>
+
+                            </FrameLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- After image tile -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardPickAfter"
+                            android:layout_width="0dp"
+                            android:layout_height="150dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                            app:cardCornerRadius="12dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:strokeWidth="1dp">
+
+                            <FrameLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent">
+
+                                <ImageView
+                                    android:id="@+id/imgAfter"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:scaleType="centerCrop"
+                                    android:visibility="gone" />
+
+                                <!-- Placeholder -->
+                                <LinearLayout
+                                    android:id="@+id/placeholderAfter"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:gravity="center"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="+"
+                                        android:textSize="28sp"
+                                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="4dp"
+                                        android:text="@string/hint_tap_to_choose"
+                                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                                </LinearLayout>
+
+                                <!-- "AFTER" badge at bottom-start -->
+                                <com.google.android.material.card.MaterialCardView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="bottom|start"
+                                    android:layout_margin="8dp"
+                                    app:cardBackgroundColor="#CC000000"
+                                    app:cardCornerRadius="6dp"
+                                    app:cardElevation="0dp"
+                                    app:strokeWidth="0dp">
+
+                                    <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:paddingHorizontal="8dp"
+                                        android:paddingVertical="3dp"
+                                        android:text="@string/label_after_image"
+                                        android:textAllCaps="true"
+                                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                                        android:textColor="@android:color/white" />
+
+                                </com.google.android.material.card.MaterialCardView>
+
+                            </FrameLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                    </LinearLayout>
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <SeekBar
-                    android:id="@+id/seekPixelSize"
+            <!-- ── Card: Effect ─────────────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardEffect"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:max="46"
-                    android:progress="14" />
-            </LinearLayout>
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-            <!-- Direction ─────────────────────────────────────────── -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/label_direction"
-                android:textAppearance="?attr/textAppearanceLabelLarge" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.12"
+                        android:text="@string/section_effect"
+                        android:textAllCaps="true"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:textColor="?attr/colorPrimary" />
 
-            <RadioGroup
-                android:id="@+id/rgDirection"
+                    <!-- Blur Type chips -->
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:scrollbars="none">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/chipGroupBlurType"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:singleSelection="true"
+                            app:selectionRequired="true">
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipGaussian"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/blur_type_gaussian" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipFrosted"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/blur_type_frosted" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipDarkFade"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/blur_type_dark_fade" />
+
+                            <com.google.android.material.chip.Chip
+                                android:id="@+id/chipPixelate"
+                                style="@style/Widget.Material3.Chip.Filter"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/blur_type_pixelate" />
+
+                        </com.google.android.material.chip.ChipGroup>
+
+                    </HorizontalScrollView>
+
+                    <!-- Blur Radius group (hidden when PIXELATE is selected) -->
+                    <LinearLayout
+                        android:id="@+id/groupBlurRadius"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="4dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/label_blur_radius"
+                                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                            <TextView
+                                android:id="@+id/tvBlurRadiusValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:minWidth="32dp"
+                                android:gravity="end"
+                                android:text="15"
+                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textColor="?attr/colorPrimary" />
+                        </LinearLayout>
+
+                        <SeekBar
+                            android:id="@+id/seekBlurRadius"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="24"
+                            android:progress="14" />
+
+                    </LinearLayout>
+
+                    <!-- Pixel Size group (shown only when PIXELATE is selected) -->
+                    <LinearLayout
+                        android:id="@+id/groupPixelSize"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="4dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/label_pixel_size"
+                                android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                            <TextView
+                                android:id="@+id/tvPixelSizeValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:minWidth="32dp"
+                                android:gravity="end"
+                                android:text="16"
+                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textColor="?attr/colorPrimary" />
+                        </LinearLayout>
+
+                        <SeekBar
+                            android:id="@+id/seekPixelSize"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:max="46"
+                            android:progress="14" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Card: Appearance ─────────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:orientation="horizontal">
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
-                <RadioButton
-                    android:id="@+id/rbBeforeAfter"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:checked="true"
-                    android:text="@string/direction_before_after" />
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <RadioButton
-                    android:id="@+id/rbAfterBefore"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/direction_after_before" />
-            </RadioGroup>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.12"
+                        android:text="@string/section_appearance"
+                        android:textAllCaps="true"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:textColor="?attr/colorPrimary" />
 
-            <!-- Labels ────────────────────────────────────────────── -->
-            <LinearLayout
+                    <!-- Corner Radius -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/label_corner_radius"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <TextView
+                            android:id="@+id/tvCornerRadiusValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:minWidth="40dp"
+                            android:gravity="end"
+                            android:text="0dp"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorPrimary" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekCornerRadius"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="16dp"
+                        android:max="64"
+                        android:progress="0" />
+
+                    <!-- Divider -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <!-- Show Labels toggle row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/label_show_labels"
+                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switchLabels"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ── Card: Direction ──────────────────────────────────────── -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_marginBottom="8dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
-                <TextView
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/label_show_labels"
-                    android:textAppearance="?attr/textAppearanceLabelLarge" />
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchLabels"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true" />
-            </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:letterSpacing="0.12"
+                        android:text="@string/section_direction"
+                        android:textAllCaps="true"
+                        android:textAppearance="?attr/textAppearanceLabelSmall"
+                        android:textColor="?attr/colorPrimary" />
 
-            <!-- Corner Radius ──────────────────────────────────────── -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/toggleDirection"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:singleSelection="true"
+                        app:selectionRequired="true">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/label_corner_radius"
-                    android:textAppearance="?attr/textAppearanceLabelLarge" />
+                        <Button
+                            android:id="@+id/btnBeforeAfter"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="true"
+                            android:text="@string/direction_before_after" />
 
-                <TextView
-                    android:id="@+id/tvCornerRadiusValue"
-                    android:layout_width="52dp"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:text="0dp"
-                    android:textAppearance="?attr/textAppearanceBodyMedium" />
-            </LinearLayout>
+                        <Button
+                            android:id="@+id/btnAfterBefore"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/direction_after_before" />
 
-            <SeekBar
-                android:id="@+id/seekCornerRadius"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:max="64"
-                android:progress="0" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
 </LinearLayout>

@@ -9,4 +9,22 @@
     <string name="direction_after_before">After | Before</string>
     <string name="label_show_labels">Show Labels</string>
     <string name="label_corner_radius">Corner Radius</string>
+    <!-- Section headers -->
+    <string name="section_mode">Mode</string>
+    <string name="section_effect">Effect</string>
+    <string name="section_appearance">Appearance</string>
+    <string name="section_direction">Direction</string>
+    <string name="section_images">Images</string>
+    <!-- Mode toggle -->
+    <string name="mode_single">Single Image</string>
+    <string name="mode_dual">Two Images</string>
+    <!-- Image picker -->
+    <string name="label_before_image">Before</string>
+    <string name="label_after_image">After</string>
+    <string name="hint_tap_to_choose">Tap to choose</string>
+    <!-- Blur type chip labels -->
+    <string name="blur_type_gaussian">Gaussian</string>
+    <string name="blur_type_frosted">Frosted Glass</string>
+    <string name="blur_type_dark_fade">Dark Fade</string>
+    <string name="blur_type_pixelate">Pixelate</string>
 </resources>

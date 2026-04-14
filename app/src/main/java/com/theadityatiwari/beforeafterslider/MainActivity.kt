@@ -1,18 +1,21 @@
 package com.theadityatiwari.beforeafterslider
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
+import android.media.ExifInterface
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -25,6 +28,38 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var demoBitmap: Bitmap? = null
+
+    // ── Image pickers (must be registered before onCreate) ───────────────────
+
+    private val pickBeforeImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@registerForActivityResult
+        val reqW = binding.revealSlider.width.takeIf  { it > 0 } ?: 1080
+        val reqH = binding.revealSlider.height.takeIf { it > 0 } ?: 800
+        Thread {
+            val bmp = decodeSubsampled(uri, reqW * 2, reqH * 2)
+            if (bmp != null) runOnUiThread {
+                binding.imgBefore.setImageBitmap(bmp)
+                binding.imgBefore.visibility      = View.VISIBLE
+                binding.placeholderBefore.visibility = View.GONE
+                binding.revealSlider.setBeforeBitmap(bmp)
+            }
+        }.start()
+    }
+
+    private val pickAfterImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri ?: return@registerForActivityResult
+        val reqW = binding.revealSlider.width.takeIf  { it > 0 } ?: 1080
+        val reqH = binding.revealSlider.height.takeIf { it > 0 } ?: 800
+        Thread {
+            val bmp = decodeSubsampled(uri, reqW * 2, reqH * 2)
+            if (bmp != null) runOnUiThread {
+                binding.imgAfter.setImageBitmap(bmp)
+                binding.imgAfter.visibility      = View.VISIBLE
+                binding.placeholderAfter.visibility = View.GONE
+                binding.revealSlider.setAfterBitmap(bmp)
+            }
+        }.start()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,10 +78,12 @@ class MainActivity : AppCompatActivity() {
         binding.revealSlider.setBitmap(demoBitmap!!)
 
         setupSliderCallback()
-        setupBlurTypeSpinner()
+        setupModeToggle()
+        setupImagePickers()
+        setupBlurTypeChips()
         setupBlurRadiusSeekBar()
         setupPixelSizeSeekBar()
-        setupDirectionRadioGroup()
+        setupDirectionToggleGroup()
         setupLabelsSwitch()
         setupCornerRadiusSeekBar()
     }
@@ -61,23 +98,105 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // ── Blur Type Spinner ─────────────────────────────────────────────────────
+    // ── Mode toggle ───────────────────────────────────────────────────────────
 
-    private fun setupBlurTypeSpinner() {
-        val labels = BlurType.entries.map { it.name.replace('_', ' ') }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, labels)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerBlurType.adapter = adapter
-
-        binding.spinnerBlurType.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
-                val type = BlurType.entries[pos]
-                binding.revealSlider.setBlurType(type)
-                val isPixelate = type == BlurType.PIXELATE
-                binding.groupBlurRadius.visibility = if (isPixelate) View.GONE else View.VISIBLE
-                binding.groupPixelSize.visibility = if (isPixelate) View.VISIBLE else View.GONE
+    private fun setupModeToggle() {
+        binding.toggleMode.check(R.id.btnModeSingle)
+        binding.toggleMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val isDual = checkedId == R.id.btnModeDual
+            binding.cardImages.visibility  = if (isDual) View.VISIBLE else View.GONE
+            binding.cardEffect.visibility  = if (isDual) View.GONE    else View.VISIBLE
+            if (!isDual) {
+                // Reset image picker tiles to placeholder state
+                binding.imgBefore.visibility = View.GONE
+                binding.imgAfter.visibility  = View.GONE
+                binding.placeholderBefore.visibility = View.VISIBLE
+                binding.placeholderAfter.visibility  = View.VISIBLE
+                binding.revealSlider.clearDualBitmaps()
             }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+    }
+
+    // ── Image pickers ─────────────────────────────────────────────────────────
+
+    private fun setupImagePickers() {
+        binding.cardPickBefore.setOnClickListener { pickBeforeImage.launch("image/*") }
+        binding.cardPickAfter.setOnClickListener  { pickAfterImage.launch("image/*")  }
+    }
+
+    /**
+     * Two-pass sub-sampled decode:
+     *  Pass 1 — read only dimensions (zero pixel allocation via inJustDecodeBounds)
+     *  Pass 2 — decode at power-of-2 sample size that keeps output >= [reqW]×[reqH],
+     *            using RGB_565 (2 bytes/px) since photos have no alpha channel.
+     *
+     * A 12 MP photo decoded at inSampleSize=4 uses ~2 MB instead of ~36 MB.
+     * Must be called on a background thread.
+     */
+    private fun decodeSubsampled(uri: Uri, reqW: Int, reqH: Int): Bitmap? = try {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        opts.inSampleSize      = calculateSampleSize(opts, reqW, reqH)
+        opts.inJustDecodeBounds = false
+        opts.inPreferredConfig  = Bitmap.Config.RGB_565  // halves memory vs ARGB_8888
+        val raw = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+            ?: return null
+        applyExifRotation(uri, raw)
+    } catch (_: Throwable) { null }   // catches OutOfMemoryError (extends Error, not Exception)
+
+    /**
+     * Reads EXIF orientation from [uri] and rotates [bitmap] to upright if needed.
+     * Camera photos from Android 7+ often arrive as landscape with an EXIF tag — without
+     * this fix they display sideways or upside-down in the slider.
+     * Opens a third InputStream (cheap: header-only read) and recycles the original if a
+     * rotated copy is created.
+     */
+    private fun applyExifRotation(uri: Uri, bitmap: Bitmap): Bitmap {
+        val degrees = try {
+            contentResolver.openInputStream(uri)?.use { stream ->
+                val exif = ExifInterface(stream)
+                when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                    ExifInterface.ORIENTATION_ROTATE_90  -> 90f
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                    else -> 0f
+                }
+            } ?: 0f
+        } catch (_: Throwable) { 0f }
+        if (degrees == 0f) return bitmap
+        val matrix = Matrix().apply { postRotate(degrees) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            .also { rotated -> if (rotated !== bitmap) bitmap.recycle() }
+    }
+
+    /**
+     * Returns the largest power-of-2 inSampleSize such that the decoded image
+     * is still at least [reqW]×[reqH] pixels — enough for a high-quality centerCrop.
+     */
+    private fun calculateSampleSize(opts: BitmapFactory.Options, reqW: Int, reqH: Int): Int {
+        val rawW = opts.outWidth; val rawH = opts.outHeight
+        var size = 1
+        while ((rawW / (size * 2)) >= reqW && (rawH / (size * 2)) >= reqH) size *= 2
+        return size
+    }
+
+    // ── Blur Type Chips ───────────────────────────────────────────────────────
+
+    private fun setupBlurTypeChips() {
+        val chipToType = mapOf(
+            R.id.chipGaussian  to BlurType.GAUSSIAN,
+            R.id.chipFrosted   to BlurType.FROSTED_GLASS,
+            R.id.chipDarkFade  to BlurType.DARK_FADE,
+            R.id.chipPixelate  to BlurType.PIXELATE,
+        )
+        binding.chipGroupBlurType.setOnCheckedStateChangeListener { _, checkedIds ->
+            val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
+            val type = chipToType[id] ?: return@setOnCheckedStateChangeListener
+            binding.revealSlider.setBlurType(type)
+            val isPixelate = type == BlurType.PIXELATE
+            binding.groupBlurRadius.visibility = if (isPixelate) View.GONE else View.VISIBLE
+            binding.groupPixelSize.visibility  = if (isPixelate) View.VISIBLE else View.GONE
         }
     }
 
@@ -111,13 +230,15 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // ── Direction RadioGroup ──────────────────────────────────────────────────
+    // ── Direction Toggle Group ────────────────────────────────────────────────
 
-    private fun setupDirectionRadioGroup() {
-        binding.rgDirection.setOnCheckedChangeListener { _, checkedId ->
+    private fun setupDirectionToggleGroup() {
+        binding.toggleDirection.check(R.id.btnBeforeAfter)
+        binding.toggleDirection.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
             val dir = when (checkedId) {
-                R.id.rbBeforeAfter -> SliderDirection.BEFORE_AFTER
-                else -> SliderDirection.AFTER_BEFORE
+                R.id.btnBeforeAfter -> SliderDirection.BEFORE_AFTER
+                else                -> SliderDirection.AFTER_BEFORE
             }
             binding.revealSlider.setDirection(dir)
         }

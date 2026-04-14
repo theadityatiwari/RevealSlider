@@ -25,8 +25,19 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Run RevealSlider unit tests
+        run: ./gradlew :revealslider:test --no-daemon
+
       - name: Build RevealSlider release AAR
         run: ./gradlew :revealslider:assembleRelease --no-daemon
+
+      - name: Upload test report
+        if: always()   # upload even when tests fail so the report is accessible
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ github.sha }}
+          path: revealslider/build/reports/tests/testDebugUnitTest/
+          retention-days: 7
 
       - name: Upload AAR artifact
         uses: actions/upload-artifact@v4

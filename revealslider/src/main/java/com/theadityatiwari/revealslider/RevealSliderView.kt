@@ -1,5 +1,8 @@
 package com.theadityatiwari.revealslider
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -13,8 +16,11 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import java.util.concurrent.atomic.AtomicInteger
@@ -34,10 +40,19 @@ class RevealSliderView @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : View(context, attrs, defStyleAttr) {
 
-    // ── Public callback interface ─────────────────────────────────────────────
+    // ── Public callback interfaces ────────────────────────────────────────────
 
     interface OnSliderChangeListener {
         fun onSliderMoved(position: Float)
+    }
+
+    /**
+     * Fired on the **main thread** when a background computation fails.
+     * Integrators should use this to show a fallback UI or log the error.
+     * [cause] is typically an [OutOfMemoryError] on constrained devices.
+     */
+    fun interface OnSliderErrorListener {
+        fun onError(cause: Throwable)
     }
 
     // ── Volatile render state (written on BG thread, read on main thread) ─────
@@ -45,9 +60,17 @@ class RevealSliderView @JvmOverloads constructor(
     @Volatile private var scaledBitmap: Bitmap? = null
     @Volatile private var styledBitmap: Bitmap? = null
 
+    // Dual-image mode — both must be non-null for dual rendering to activate
+    @Volatile private var scaledBeforeBitmap: Bitmap? = null
+    @Volatile private var scaledAfterBitmap: Bitmap? = null
+
     // ── Configuration ─────────────────────────────────────────────────────────
 
     private var originalBitmap: Bitmap? = null
+    // @Volatile: written on main thread, referenced in guards inside mainHandler.post
+    // callbacks that may interleave with clearDualBitmaps() calls.
+    @Volatile private var dualBeforeBitmap: Bitmap? = null
+    @Volatile private var dualAfterBitmap: Bitmap? = null
 
     private var blurType: BlurType = BlurType.GAUSSIAN
     private var blurRadius: Float = 15f
@@ -92,14 +115,19 @@ class RevealSliderView @JvmOverloads constructor(
     private val rightArrowPath = Path()
     private val labelRect = RectF()
 
-    // ── Listener ──────────────────────────────────────────────────────────────
+    // ── Listeners ─────────────────────────────────────────────────────────────
 
     private var sliderListener: OnSliderChangeListener? = null
+    private var errorListener: OnSliderErrorListener? = null
+    private var positionAnimator: ValueAnimator? = null
 
     // ── Background threading ──────────────────────────────────────────────────
 
-    private val computeThread = HandlerThread("RevealSliderCompute").also { it.start() }
-    private val bgHandler = Handler(computeThread.looper)
+    // var, not val: onAttachedToWindow must be able to replace these after
+    // onDetachedFromWindow has permanently quit the previous HandlerThread.
+    // A HandlerThread cannot be restarted after quit() — a new instance is required.
+    private var computeThread = HandlerThread("RevealSliderCompute").also { it.start() }
+    private var bgHandler = Handler(computeThread.looper)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
@@ -109,6 +137,14 @@ class RevealSliderView @JvmOverloads constructor(
      * result is stale and is discarded.
      */
     private val generation = AtomicInteger(0)
+
+    /**
+     * Tokens used as message tags so [scheduleBeforeRecompute] and
+     * [scheduleAfterRecompute] can cancel only their own pending job without
+     * interfering with the other side.
+     */
+    private val BEFORE_TOKEN = Any()
+    private val AFTER_TOKEN  = Any()
 
     // ─────────────────────────────────────────────────────────────────────────
     // Initialisation
@@ -162,6 +198,9 @@ class RevealSliderView @JvmOverloads constructor(
         }
 
         applyPaints()
+
+        // Required for keyboard navigation and TalkBack focus
+        isFocusable = true
     }
 
     private fun applyPaints() {
@@ -191,6 +230,43 @@ class RevealSliderView @JvmOverloads constructor(
         originalBitmap = bitmap
         if (width > 0 && height > 0) scheduleFullRecompute()
         // else: triggered once onSizeChanged delivers non-zero dimensions
+    }
+
+    /**
+     * Dual-image mode: set the "before" (left) image independently.
+     * Both [setBeforeBitmap] and [setAfterBitmap] must be called before
+     * dual rendering activates. Dual mode takes priority over single-image mode.
+     */
+    fun setBeforeBitmap(bitmap: Bitmap) {
+        dualBeforeBitmap = bitmap
+        if (width > 0 && height > 0) scheduleBeforeRecompute()
+    }
+
+    /**
+     * Dual-image mode: set the "after" (right) image independently.
+     * See [setBeforeBitmap].
+     */
+    fun setAfterBitmap(bitmap: Bitmap) {
+        dualAfterBitmap = bitmap
+        if (width > 0 && height > 0) scheduleAfterRecompute()
+    }
+
+    /**
+     * Exit dual-image mode and return to single-image + effect rendering.
+     * If a bitmap was previously set via [setBitmap], it will re-render immediately.
+     */
+    fun clearDualBitmaps() {
+        dualBeforeBitmap = null
+        dualAfterBitmap = null
+        // Recycle before nulling to release memory immediately
+        scaledBeforeBitmap?.recycle()
+        scaledAfterBitmap?.recycle()
+        scaledBeforeBitmap = null
+        scaledAfterBitmap = null
+        generation.incrementAndGet()
+        bgHandler.removeCallbacksAndMessages(null)
+        if (originalBitmap != null && width > 0 && height > 0) scheduleFullRecompute()
+        else invalidate()
     }
 
     fun setBlurType(type: BlurType) {
@@ -227,8 +303,43 @@ class RevealSliderView @JvmOverloads constructor(
     }
 
     fun setDividerPosition(position: Float) {
+        positionAnimator?.cancel()
         dividerPosition = position.coerceIn(0f, 1f)
         invalidate()
+    }
+
+    /**
+     * Smoothly animates the divider from its current position to [targetPosition] (0–1).
+     * Fires [OnSliderChangeListener.onSliderMoved] on every frame, and announces the
+     * final percentage to TalkBack when the animation ends.
+     *
+     * Calling [animateTo] while an animation is in progress cancels the previous one
+     * and starts fresh from wherever the divider currently is.
+     *
+     * @param targetPosition Destination divider position in the range [0, 1].
+     * @param durationMs     Animation duration in milliseconds (default 300 ms).
+     */
+    fun animateTo(targetPosition: Float, durationMs: Long = 300L) {
+        val target = targetPosition.coerceIn(0f, 1f)
+        positionAnimator?.cancel()
+        positionAnimator = ValueAnimator.ofFloat(dividerPosition, target).apply {
+            duration = durationMs
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { anim ->
+                val pos = anim.animatedValue as Float
+                dividerPosition = pos
+                sliderListener?.onSliderMoved(pos)
+                invalidate()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    announceForAccessibility(
+                        resources.getString(R.string.rsv_accessibility_desc, (target * 100).toInt())
+                    )
+                }
+            })
+            start()
+        }
     }
 
     fun setShowLabels(show: Boolean) {
@@ -299,6 +410,15 @@ class RevealSliderView @JvmOverloads constructor(
         sliderListener = listener
     }
 
+    fun setOnSliderErrorListener(listener: OnSliderErrorListener?) {
+        errorListener = listener
+    }
+
+    /** Posts [cause] to the main thread and delivers it to [errorListener]. */
+    private fun notifyError(cause: Throwable) {
+        mainHandler.post { errorListener?.onError(cause) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Layout
     // ─────────────────────────────────────────────────────────────────────────
@@ -306,7 +426,10 @@ class RevealSliderView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         rebuildCornerPath()
-        if (w > 0 && h > 0 && originalBitmap != null) scheduleFullRecompute()
+        if (w > 0 && h > 0) {
+            if (dualBeforeBitmap != null && dualAfterBitmap != null) scheduleDualRecompute()
+            else if (originalBitmap != null) scheduleFullRecompute()
+        }
     }
 
     private fun rebuildCornerPath() {
@@ -329,41 +452,151 @@ class RevealSliderView @JvmOverloads constructor(
         val src = originalBitmap ?: return
         val w = width; val h = height
         if (w <= 0 || h <= 0) return
+        // Snapshot every mutable config field as an immutable local val before
+        // crossing the thread boundary. The bg thread must never read shared
+        // mutable state directly — fields written on the main thread after this
+        // point are not guaranteed visible to the bg thread by the JMM.
+        val scaleType     = scaleType
+        val blurType      = blurType
+        val blurRadius    = blurRadius
+        val frostedAlpha  = frostedAlpha
+        val darkFadeAlpha = darkFadeAlpha
+        val pixelSize     = pixelSize
 
         bgHandler.removeCallbacksAndMessages(null)
         bgHandler.post {
-            val scaled = BlurEngine.scaleBitmap(src, w, h, scaleType)
-            val styled = BlurEngine.applyEffect(
-                context, scaled.copy(Bitmap.Config.ARGB_8888, true),
-                blurType, blurRadius, frostedAlpha, darkFadeAlpha, pixelSize,
-            )
-            mainHandler.post {
-                if (generation.get() == gen) {
-                    scaledBitmap = scaled
-                    styledBitmap = styled
-                    invalidate()
+            try {
+                val scaled = BlurEngine.scaleBitmap(src, w, h, scaleType)
+                val styled = BlurEngine.applyEffect(
+                    context, scaled.copy(Bitmap.Config.ARGB_8888, true),
+                    blurType, blurRadius, frostedAlpha, darkFadeAlpha, pixelSize,
+                )
+                mainHandler.post {
+                    if (generation.get() == gen) {
+                        scaledBitmap = scaled
+                        styledBitmap = styled
+                        invalidate()
+                    }
                 }
-            }
+            } catch (t: Throwable) { notifyError(t) }
         }
+    }
+
+    /**
+     * Dual-image full recompute: re-scales BOTH sides. Used only by [onSizeChanged]
+     * (e.g., screen rotation) where both must be regenerated at the new dimensions.
+     * Cancels all pending jobs and uses the generation counter to discard stale results.
+     */
+    private fun scheduleDualRecompute() {
+        val before = dualBeforeBitmap ?: return
+        val after  = dualAfterBitmap  ?: return
+        val gen = generation.incrementAndGet()
+        val w = width; val h = height
+        if (w <= 0 || h <= 0) return
+        val scaleType = scaleType  // snapshot before crossing thread boundary
+
+        bgHandler.removeCallbacksAndMessages(null)
+        bgHandler.post {
+            try {
+                val newBefore = BlurEngine.scaleBitmap(before, w, h, scaleType)
+                val newAfter  = BlurEngine.scaleBitmap(after,  w, h, scaleType)
+                mainHandler.post {
+                    if (generation.get() == gen) {
+                        scaledBeforeBitmap?.recycle()
+                        scaledAfterBitmap?.recycle()
+                        scaledBeforeBitmap = newBefore
+                        scaledAfterBitmap  = newAfter
+                        invalidate()
+                    } else {
+                        newBefore.recycle()
+                        newAfter.recycle()
+                    }
+                }
+            } catch (t: Throwable) { notifyError(t) }
+        }
+    }
+
+    /**
+     * Re-scales only the "before" side. Called by [setBeforeBitmap] so a new
+     * before image never re-scales the already-computed after side.
+     * Uses [BEFORE_TOKEN] so only same-side pending jobs are cancelled.
+     */
+    private fun scheduleBeforeRecompute() {
+        val before = dualBeforeBitmap ?: return
+        val w = width; val h = height
+        if (w <= 0 || h <= 0) return
+        val scaleType = scaleType  // snapshot before crossing thread boundary
+
+        bgHandler.removeCallbacksAndMessages(BEFORE_TOKEN)
+        bgHandler.postAtTime({
+            try {
+                val newBefore = BlurEngine.scaleBitmap(before, w, h, scaleType)
+                mainHandler.post {
+                    if (dualBeforeBitmap != null) {   // guard: still in dual mode
+                        scaledBeforeBitmap?.recycle()
+                        scaledBeforeBitmap = newBefore
+                        invalidate()
+                    } else {
+                        newBefore.recycle()           // mode switched away — discard
+                    }
+                }
+            } catch (t: Throwable) { notifyError(t) }
+        }, BEFORE_TOKEN, 0)
+    }
+
+    /**
+     * Re-scales only the "after" side. Called by [setAfterBitmap] so a new
+     * after image never re-scales the already-computed before side.
+     * Uses [AFTER_TOKEN] so only same-side pending jobs are cancelled.
+     */
+    private fun scheduleAfterRecompute() {
+        val after = dualAfterBitmap ?: return
+        val w = width; val h = height
+        if (w <= 0 || h <= 0) return
+        val scaleType = scaleType  // snapshot before crossing thread boundary
+
+        bgHandler.removeCallbacksAndMessages(AFTER_TOKEN)
+        bgHandler.postAtTime({
+            try {
+                val newAfter = BlurEngine.scaleBitmap(after, w, h, scaleType)
+                mainHandler.post {
+                    if (dualAfterBitmap != null) {    // guard: still in dual mode
+                        scaledAfterBitmap?.recycle()
+                        scaledAfterBitmap = newAfter
+                        invalidate()
+                    } else {
+                        newAfter.recycle()            // mode switched away — discard
+                    }
+                }
+            } catch (t: Throwable) { notifyError(t) }
+        }, AFTER_TOKEN, 0)
     }
 
     /** Style-only recompute: re-apply effect to the already-scaled bitmap. */
     private fun scheduleStyleRecompute() {
         val scaled = scaledBitmap ?: run { scheduleFullRecompute(); return }
         val gen = generation.incrementAndGet()
+        // Snapshot before crossing thread boundary (see scheduleFullRecompute)
+        val blurType      = blurType
+        val blurRadius    = blurRadius
+        val frostedAlpha  = frostedAlpha
+        val darkFadeAlpha = darkFadeAlpha
+        val pixelSize     = pixelSize
 
         bgHandler.removeCallbacksAndMessages(null)
         bgHandler.post {
-            val styled = BlurEngine.applyEffect(
-                context, scaled.copy(Bitmap.Config.ARGB_8888, true),
-                blurType, blurRadius, frostedAlpha, darkFadeAlpha, pixelSize,
-            )
-            mainHandler.post {
-                if (generation.get() == gen) {
-                    styledBitmap = styled
-                    invalidate()
+            try {
+                val styled = BlurEngine.applyEffect(
+                    context, scaled.copy(Bitmap.Config.ARGB_8888, true),
+                    blurType, blurRadius, frostedAlpha, darkFadeAlpha, pixelSize,
+                )
+                mainHandler.post {
+                    if (generation.get() == gen) {
+                        styledBitmap = styled
+                        invalidate()
+                    }
                 }
-            }
+            } catch (t: Throwable) { notifyError(t) }
         }
     }
 
@@ -373,16 +606,29 @@ class RevealSliderView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val sharp = scaledBitmap ?: return
-        val styled = styledBitmap ?: return
 
         // Clip to rounded rectangle (no-op if cornerRadius == 0)
         if (cornerRadius > 0f) canvas.clipPath(cornerPath)
 
         val divX = width * dividerPosition
-        val (leftBmp, rightBmp) = when (direction) {
-            SliderDirection.BEFORE_AFTER -> styled to sharp   // left = blurred
-            SliderDirection.AFTER_BEFORE -> sharp to styled   // left = sharp
+
+        // Dual-image mode takes priority when both scaled bitmaps are ready
+        val (leftBmp, rightBmp) = run {
+            val before = scaledBeforeBitmap
+            val after  = scaledAfterBitmap
+            if (before != null && after != null) {
+                when (direction) {
+                    SliderDirection.BEFORE_AFTER -> before to after
+                    SliderDirection.AFTER_BEFORE -> after  to before
+                }
+            } else {
+                val sharp  = scaledBitmap  ?: return
+                val styled = styledBitmap  ?: return
+                when (direction) {
+                    SliderDirection.BEFORE_AFTER -> styled to sharp   // left = blurred
+                    SliderDirection.AFTER_BEFORE -> sharp  to styled  // left = sharp
+                }
+            }
         }
 
         // Left half
@@ -508,8 +754,68 @@ class RevealSliderView @JvmOverloads constructor(
     // Lifecycle
     // ─────────────────────────────────────────────────────────────────────────
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (!computeThread.isAlive) {
+            // Previous thread was killed by onDetachedFromWindow. A HandlerThread
+            // cannot be restarted after quit(), so create a fresh one.
+            computeThread = HandlerThread("RevealSliderCompute").also { it.start() }
+            bgHandler = Handler(computeThread.looper)
+            // Re-trigger the correct compute path so the view renders on reattach.
+            // If dimensions also changed, onSizeChanged will fire after this and
+            // schedule its own recompute — the generation counter discards the stale one.
+            if (width > 0 && height > 0) {
+                when {
+                    dualBeforeBitmap != null && dualAfterBitmap != null -> scheduleDualRecompute()
+                    originalBitmap != null -> scheduleFullRecompute()
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Accessibility
+    // ─────────────────────────────────────────────────────────────────────────
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        // Reporting as SeekBar causes TalkBack to announce "slider" and read
+        // the current value as a percentage rather than just the view class name.
+        info.className = android.widget.SeekBar::class.java.name
+        AccessibilityNodeInfoCompat.wrap(info).setRangeInfo(
+            AccessibilityNodeInfoCompat.RangeInfoCompat.obtain(
+                AccessibilityNodeInfoCompat.RangeInfoCompat.RANGE_TYPE_INT,
+                0f, 100f, dividerPosition * 100f,
+            )
+        )
+    }
+
+    /**
+     * Keyboard / D-pad navigation: left/right arrows move the divider by 5% per key press.
+     * Fires the same [OnSliderChangeListener] callback as touch, and announces the new
+     * position to TalkBack via [announceForAccessibility].
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val step = 0.05f
+        val newPos = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT  -> (dividerPosition - step).coerceIn(0f, 1f)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> (dividerPosition + step).coerceIn(0f, 1f)
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        if (newPos != dividerPosition) {
+            dividerPosition = newPos
+            sliderListener?.onSliderMoved(newPos)
+            invalidate()
+            announceForAccessibility(
+                resources.getString(R.string.rsv_accessibility_desc, (newPos * 100).toInt())
+            )
+        }
+        return true
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        positionAnimator?.cancel()
         bgHandler.removeCallbacksAndMessages(null)
         computeThread.quitSafely()
     }
