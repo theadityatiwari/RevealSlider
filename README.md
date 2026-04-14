@@ -6,7 +6,7 @@
 
 <img src="art/demo.gif" width="270" alt="Single-image blur demo"/>
 &nbsp;&nbsp;&nbsp;
-<img src="art/demo_two_image.mp4" width="270" alt="Two-image comparison demo"/>
+<img src="art/demo_two_image.gif" width="270" alt="Two-image comparison demo"/>
 
 [![JitPack](https://jitpack.io/v/theadityatiwari/RevealSlider.svg)](https://jitpack.io/#theadityatiwari/RevealSlider)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
