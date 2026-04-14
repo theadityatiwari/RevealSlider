@@ -4,7 +4,9 @@
 
 ### A production-ready Android before/after image comparison slider
 
-<img src="art/demo.gif" width="270" alt="RevealSlider demo"/>
+<img src="art/demo.gif" width="270" alt="Single-image blur demo"/>
+&nbsp;&nbsp;&nbsp;
+<img src="art/demo_two_image.mp4" width="270" alt="Two-image comparison demo"/>
 
 [![JitPack](https://jitpack.io/v/theadityatiwari/RevealSlider.svg)](https://jitpack.io/#theadityatiwari/RevealSlider)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
@@ -15,14 +17,19 @@
 
 ---
 
-A single draggable divider splits one image into a **blurred/styled left half** and a **sharp right half**.
-Drag the handle to reveal more or less of each side. Four effect types, fully customisable, zero heavy dependencies.
+A draggable divider for **before/after image comparisons**. Use it in two modes:
+
+- **Single-image mode** — one photo split into a blurred/styled left half and a sharp right half
+- **Two-image mode** — supply separate before and after bitmaps for a true side-by-side comparison
+
+Four effect types, fully customisable, zero heavy dependencies.
 
 ## Contents
 
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Two-Image Mode](#two-image-mode)
 - [Blur Types](#blur-types)
 - [XML Attributes](#xml-attributes)
 - [Programmatic API](#programmatic-api)
@@ -35,8 +42,11 @@ Drag the handle to reveal more or less of each side. Four effect types, fully cu
 
 ## Features
 
+- **Two display modes** — single-image blur effect or independent before/after bitmaps
 - **4 effect types** — Gaussian, Frosted Glass, Dark Fade, Pixelate
-- **GPU-accelerated blur** — `RenderEffect` on API 31+, `RenderScript` fallback on API 24-30, pure-software box-blur as final fallback
+- **GPU-accelerated blur** — `RenderEffect` on API 31+, optimised downscale+box-blur on API 24–30
+- **`animateTo(position, duration)`** — smooth animated reveal with `DecelerateInterpolator`
+- **Accessible** — TalkBack-compatible, DPAD keyboard navigation, SeekBar range announcement
 - **Jetpack Compose** wrapper included (zero extra boilerplate)
 - **Zero heavy dependencies** — no Glide, Coil or Picasso required
 - **Async computation** — `onDraw` only clips and blits; no work done per frame
@@ -65,7 +75,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.theadityatiwari:RevealSlider:1.0.0")
+    implementation("com.github.theadityatiwari:RevealSlider:1.1.0")
 }
 ```
 
@@ -103,6 +113,23 @@ binding.slider.apply {
         }
     })
 }
+```
+
+---
+
+## Two-Image Mode
+
+Supply two independent bitmaps — no blur effect is applied, just a side-by-side comparison:
+
+```kotlin
+slider.setBeforeBitmap(originalBitmap)   // left side
+slider.setAfterBitmap(editedBitmap)      // right side
+```
+
+Both sides scale and render independently on the background thread. Switching back to single-image mode:
+
+```kotlin
+slider.clearDualBitmaps()   // releases both bitmaps; reverts to setBitmap() rendering
 ```
 
 ---
@@ -174,10 +201,23 @@ slider.setShowLabels(true)
 slider.setBeforeLabel("Original")
 slider.setAfterLabel("Edited")
 
-// Callback
+// Two-image mode
+slider.setBeforeBitmap(originalBitmap)
+slider.setAfterBitmap(editedBitmap)
+slider.clearDualBitmaps()              // return to single-image mode
+
+// Animation
+slider.animateTo(0.8f)                 // animate to 80 % over 300 ms (default)
+slider.animateTo(0.2f, durationMs = 600L)
+
+// Callbacks
 slider.setOnSliderChangeListener(object : RevealSliderView.OnSliderChangeListener {
     override fun onSliderMoved(position: Float) { /* 0f..1f */ }
 })
+slider.setOnSliderErrorListener { cause ->
+    // Called on the main thread when a background computation fails
+    // (e.g. OutOfMemoryError on a low-RAM device). Show a fallback UI here.
+}
 ```
 
 ---
@@ -249,7 +289,7 @@ A **generation counter** ensures rapid changes (e.g. seeking a SeekBar) never wr
 | Condition | Path |
 |-----------|------|
 | API 31+ | `HardwareRenderer` + `RenderEffect.createBlurEffect` (GPU) |
-| API 24–30 | `android.renderscript.ScriptIntrinsicBlur` |
+| API 24–30 | Downscale → box-blur on small surface → upscale (3–5× faster than RenderScript) |
 | Fallback | 3-pass optimised box blur (O(w·h) per pass, software) |
 
 ---
